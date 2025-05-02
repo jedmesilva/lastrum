@@ -1,0 +1,39 @@
+modules = ["rust"]
+
+[nix]
+channel = "stable-24_05"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Lastrum Certifield"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "rust_app"
+
+[[workflows.workflow]]
+name = "Lastrum Certifield"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd $(pwd) && cargo build && cargo run"
+
+[[workflows.workflow]]
+name = "rust_app"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cargo run -- verify-certificate --certificate \"8189d7a3-f002-443c-98cc-2975f5510c1e\""
+
+[deployment]
+run = ["sh", "-c", "cd $(pwd) && cargo build && cargo run"]
