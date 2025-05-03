@@ -5,7 +5,7 @@
 
 use serde::{Serialize, Deserialize};
 use std::fs;
-use std::path::PathBuf;
+// PathBuf utilizado apenas em funções comentadas
 use uuid::Uuid;
 
 use crate::config::Config;

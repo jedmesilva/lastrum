@@ -3,8 +3,7 @@
 //! This module provides functions for signing data using
 //! the ed25519 signature algorithm.
 
-use ed25519_dalek::{Keypair, Signer as DalekSigner};
-use serde_json;
+use ed25519_dalek::{Signer as DalekSigner};
 
 use crate::certifield::model::Certificate;
 use crate::core::keypair::KeyPair;

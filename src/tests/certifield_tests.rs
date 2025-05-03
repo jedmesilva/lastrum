@@ -12,25 +12,12 @@ use crate::core::{
     signer::Signer,
     validator::Validator,
 };
-use rusqlite::Connection;
+// Removido import desnecessário de Connection (usando new_in_memory)
 
 #[test]
 fn test_certificate_full_lifecycle() {
     // Create an in-memory database for this test
-    let conn = Connection::open_in_memory().unwrap();
-    conn.execute(
-        "CREATE TABLE certificates (
-            id TEXT PRIMARY KEY,
-            data TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )",
-        [],
-    ).unwrap();
-    
-    let storage = CertificateStorage {
-        db_path: std::path::PathBuf::from(":memory:"),
-        conn,
-    };
+    let storage = CertificateStorage::new_in_memory().unwrap();
     
     // Create an identity
     let identity = Identity::new("Test Custody House".to_string()).unwrap();

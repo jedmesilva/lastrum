@@ -42,6 +42,28 @@ impl CertificateStorage {
         })
     }
     
+    /// Create a certificate storage manager with an in-memory database for testing
+    #[cfg(test)]
+    pub fn new_in_memory() -> Result<Self, LastrumError> {
+        let conn = Connection::open_in_memory()
+            .map_err(|e| LastrumError::DatabaseError(format!("Failed to open in-memory database: {}", e)))?;
+        
+        // Create tables
+        conn.execute(
+            "CREATE TABLE certificates (
+                id TEXT PRIMARY KEY,
+                data TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )",
+            [],
+        ).map_err(|e| LastrumError::DatabaseError(format!("Failed to create table: {}", e)))?;
+        
+        Ok(Self {
+            db_path: PathBuf::from(":memory:"),
+            conn,
+        })
+    }
+    
     /// Store a certificate
     pub fn store(&self, certificate: &Certificate) -> Result<String, LastrumError> {
         let json = serde_json::to_string(certificate)
@@ -111,7 +133,7 @@ mod tests {
     use super::*;
     use crate::certifield::model::{Asset, AssetType};
     use crate::certifield::builder::CertificateBuilder;
-    use tempfile::tempdir;
+    // tempdir não é mais necessário com new_in_memory
     
     /// Helper to create a test certificate
     fn create_test_certificate() -> Certificate {
@@ -128,20 +150,7 @@ mod tests {
     #[test]
     fn test_store_and_load() {
         // Create an in-memory database for testing
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute(
-            "CREATE TABLE certificates (
-                id TEXT PRIMARY KEY,
-                data TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )",
-            [],
-        ).unwrap();
-        
-        let storage = CertificateStorage {
-            db_path: PathBuf::from(":memory:"),
-            conn,
-        };
+        let storage = CertificateStorage::new_in_memory().unwrap();
         
         let certificate = create_test_certificate();
         let id = storage.store(&certificate).unwrap();
@@ -155,20 +164,7 @@ mod tests {
     #[test]
     fn test_list_all() {
         // Create an in-memory database for testing
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute(
-            "CREATE TABLE certificates (
-                id TEXT PRIMARY KEY,
-                data TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )",
-            [],
-        ).unwrap();
-        
-        let storage = CertificateStorage {
-            db_path: PathBuf::from(":memory:"),
-            conn,
-        };
+        let storage = CertificateStorage::new_in_memory().unwrap();
         
         // Store multiple certificates
         let cert1 = create_test_certificate();
@@ -184,20 +180,7 @@ mod tests {
     #[test]
     fn test_delete() {
         // Create an in-memory database for testing
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute(
-            "CREATE TABLE certificates (
-                id TEXT PRIMARY KEY,
-                data TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )",
-            [],
-        ).unwrap();
-        
-        let storage = CertificateStorage {
-            db_path: PathBuf::from(":memory:"),
-            conn,
-        };
+        let storage = CertificateStorage::new_in_memory().unwrap();
         
         let certificate = create_test_certificate();
         let id = storage.store(&certificate).unwrap();

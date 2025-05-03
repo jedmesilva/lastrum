@@ -6,3 +6,4 @@
 pub mod identity_tests;
 pub mod signer_tests;
 pub mod certifield_tests;
+pub mod network_tests;

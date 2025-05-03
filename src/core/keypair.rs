@@ -5,7 +5,7 @@
 
 use ed25519_dalek::{Keypair as DalekKeypair, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
 // Use the version of rand that ed25519-dalek expects (0.7.x)
-use rand_7 as rand;
+// rand é utilizado indiretamente via ed25519_dalek
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use base64::{encode, decode};
 

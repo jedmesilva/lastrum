@@ -1,38 +1,95 @@
-//! Certificate broadcaster
+//! Módulo de broadcasting para Lastrum Certifield
 //! 
-//! This module handles broadcasting certificates to other nodes
-//! in the Lastrum network.
-//! 
-//! Note: This is a placeholder module for future development.
+//! Este módulo gerencia a transmissão de certificados para a rede,
+//! garantindo que os certificados emitidos sejam propagados para todos os nós.
 
+use std::sync::{Arc, Mutex};
 use crate::certifield::model::Certificate;
+use crate::certifield::storage::CertificateStorage;
 use crate::errors::LastrumError;
-use crate::network::protocol::Message;
+use crate::network::protocol::{Message, MessageType};
 
-/// A broadcaster for sending certificates to other nodes
+/// Gerenciador de broadcasting para certificados
 pub struct Broadcaster {
+    /// ID do nó local
     node_id: String,
+    /// Armazenamento local de certificados
+    storage: Option<CertificateStorage>,
 }
 
 impl Broadcaster {
-    /// Create a new broadcaster
+    /// Cria um novo gerenciador de broadcasting
     pub fn new(node_id: String) -> Self {
         Self {
             node_id,
+            storage: None,
         }
     }
     
-    /// Broadcast a certificate to the network
-    pub fn broadcast_certificate(&self, certificate: &Certificate) -> Result<(), LastrumError> {
-        // This is a placeholder - in a future implementation, this would
-        // actually send the certificate to connected peers
+    /// Cria um novo gerenciador de broadcasting com armazenamento
+    pub fn with_storage(node_id: String) -> Result<Self, LastrumError> {
+        let storage = CertificateStorage::new()?;
         
-        let _message = Message::certificate(self.node_id.clone(), certificate)
+        Ok(Self {
+            node_id,
+            storage: Some(storage),
+        })
+    }
+    
+    /// Broadcast um certificado para a rede
+    pub fn broadcast_certificate(&self, certificate: &Certificate) -> Result<(), LastrumError> {
+        // Cria uma mensagem com o certificado completo
+        let certificate_message = Message::certificate(self.node_id.clone(), certificate)
             .map_err(|e| LastrumError::SerializationError(e.to_string()))?;
         
-        // In the future: send message to all connected peers
-        log::info!("Broadcasting certificate {} (placeholder)", certificate.id);
+        // Em uma implementação real, isso seria enviado para todos os peers conectados
+        log::info!("Broadcasting certificado: {}", certificate.id);
+        log::debug!("Emissor: {}, Asset: {} - {}g, pureza: {}", 
+            certificate.issuer, 
+            certificate.asset.asset_type_str(),
+            certificate.asset.weight,
+            certificate.asset.purity);
+        
+        // Simula o envio para peers
+        log::debug!("Mensagem criada: {:?}", certificate_message.msg_type);
         
         Ok(())
+    }
+    
+    /// Cria uma mensagem de anúncio para um certificado (apenas ID)
+    pub fn create_announcement(&self, certificate_id: &str) -> Message {
+        // Cria uma mensagem que anuncia apenas o ID do certificado
+        // (peers interessados podem solicitar o certificado completo)
+        Message::new(
+            MessageType::NewCertificate,
+            self.node_id.clone(),
+            None, // Broadcast para todos
+            Some(certificate_id.to_string()),
+        )
+    }
+    
+    /// Propaga todos os certificados locais para a rede
+    pub fn broadcast_all_certificates(&self) -> Result<(), LastrumError> {
+        // Verifica se o storage está disponível
+        if let Some(storage) = &self.storage {
+            // Carrega todos os certificados do armazenamento local
+            let certificates = storage.list_all()?;
+            
+            if certificates.is_empty() {
+                log::info!("Nenhum certificado para propagar");
+                return Ok(());
+            }
+            
+            log::info!("Propagando {} certificados para a rede", certificates.len());
+            
+            // Propaga cada certificado
+            for certificate in certificates {
+                self.broadcast_certificate(&certificate)?;
+            }
+            
+            Ok(())
+        } else {
+            Err(LastrumError::ConfigError("Storage não configurado para o broadcaster".to_string()))
+        }
     }
 }

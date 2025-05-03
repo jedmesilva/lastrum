@@ -1,0 +1,9 @@
+/home/runner/workspace/target/debug/deps/libsocket2-b12cfd99d0028205.rmeta: /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/lib.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/sockaddr.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/socket.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/sockref.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/sys/unix.rs
+
+/home/runner/workspace/target/debug/deps/socket2-b12cfd99d0028205.d: /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/lib.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/sockaddr.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/socket.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/sockref.rs /home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/sys/unix.rs
+
+/home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/lib.rs:
+/home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/sockaddr.rs:
+/home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/socket.rs:
+/home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/sockref.rs:
+/home/runner/workspace/.local/share/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.5.9/src/sys/unix.rs:

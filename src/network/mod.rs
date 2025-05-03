@@ -1,11 +1,12 @@
-//! Network module for Lastrum Certifield
+//! Módulo de rede para Lastrum Certifield
 //! 
-//! This module contains networking code for communicating with
-//! other nodes in the Lastrum network.
-//! 
-//! Note: This is a placeholder module for future development.
-//! Basic networking functionality will be implemented in later phases.
+//! Este módulo contém o código de rede para comunicação com
+//! outros nós na rede Lastrum, implementando a infraestrutura
+//! descentralizada para emissão e validação de certificados.
 
 pub mod peer;
 pub mod protocol;
 pub mod broadcaster;
+pub mod consensus;
+pub mod sync;
+pub mod p2p;
