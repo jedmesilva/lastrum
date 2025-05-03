@@ -66,17 +66,21 @@ mod tests {
         let keypair = KeyPair::generate().unwrap();
         let signer = Signer::new(keypair.clone());
         
-        let asset = Asset::new(
+        let asset = Asset::new_with_purity(
             AssetType::Gold,
             100.0,
+            "g".to_string(),
             0.999,
             "SERIAL123".to_string(),
         );
         
+        let description = "Certificação de 100g de ouro 999 sob custódia.".to_string();
+        
         let certificate = CertificateBuilder::new()
-            .with_issuer("Test Custody".to_string())
-            .with_issuer_public_key(keypair.public_key_hex())
+            .with_custody_house_id("Test Custody".to_string())
+            .with_custody_house_hash(keypair.public_key_hex())
             .with_asset(asset)
+            .with_description(description)
             .build()
             .unwrap();
         

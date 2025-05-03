@@ -33,6 +33,11 @@ impl Validator {
     
     /// Verify a certificate's signature
     pub fn verify_certificate(&self, certificate: &Certificate) -> Result<bool, LastrumError> {
+        // Check if the certificate is expired
+        if certificate.is_expired() {
+            return Err(LastrumError::CertificateExpired);
+        }
+        
         // If there's no signature, the certificate can't be verified
         let signature = match &certificate.signature {
             Some(sig) => sig,
@@ -47,7 +52,7 @@ impl Validator {
         let certificate_data = certificate.to_signable_bytes()?;
         
         // Parse the public key from the certificate
-        let public_key = KeyPair::public_key_from_hex(&certificate.issuer_public_key)?;
+        let public_key = KeyPair::public_key_from_hex(&certificate.custody_house_hash)?;
         
         // Verify the signature
         self.verify(&certificate_data, &signature_bytes, &public_key)
@@ -101,17 +106,21 @@ mod tests {
         let signer = Signer::new(keypair.clone());
         let validator = Validator::new();
         
-        let asset = Asset::new(
+        let asset = Asset::new_with_purity(
             AssetType::Gold,
             100.0,
+            "g".to_string(),
             0.999,
             "SERIAL123".to_string(),
         );
         
+        let description = "Certificação de 100g de ouro 999 sob custódia.".to_string();
+        
         let certificate = CertificateBuilder::new()
-            .with_issuer("Test Custody".to_string())
-            .with_issuer_public_key(keypair.public_key_hex())
+            .with_custody_house_id("Test Custody".to_string())
+            .with_custody_house_hash(keypair.public_key_hex())
             .with_asset(asset)
+            .with_description(description)
             .build()
             .unwrap();
         
@@ -124,10 +133,52 @@ mod tests {
         
         // Modify the certificate and verify it fails
         let mut tampered = signed.clone();
-        tampered.asset.weight = 200.0; // Change the weight
+        tampered.asset.quantity = 200.0; // Change the quantity
         
         // This should fail verification
         let result = validator.verify_certificate(&tampered).unwrap();
         assert!(!result);
+    }
+    
+    #[test]
+    fn test_verify_expired_certificate() {
+        let keypair = KeyPair::generate().unwrap();
+        let signer = Signer::new(keypair.clone());
+        let validator = Validator::new();
+        
+        let asset = Asset::new(
+            AssetType::Silver,
+            500.0,
+            "g".to_string(),
+            "SILVER-001".to_string(),
+        );
+        
+        let description = "Prata sob custódia.".to_string();
+        
+        // Create a certificate that expires immediately
+        let mut certificate = CertificateBuilder::new()
+            .with_custody_house_id("SilverCustódia".to_string())
+            .with_custody_house_hash(keypair.public_key_hex())
+            .with_asset(asset)
+            .with_description(description)
+            .build()
+            .unwrap();
+        
+        // Set expiration to yesterday
+        let past_date = Utc::now() - chrono::Duration::days(1);
+        certificate.set_expiration_date(past_date);
+        
+        // Sign the certificate
+        let signed = signer.sign_certificate(certificate).unwrap();
+        
+        // Verify should return an error because the certificate is expired
+        let result = validator.verify_certificate(&signed);
+        assert!(result.is_err());
+        
+        // Check if the error is CertificateExpired
+        match result {
+            Err(LastrumError::CertificateExpired) => {}, // Expected
+            _ => panic!("Expected CertificateExpired error"),
+        }
     }
 }

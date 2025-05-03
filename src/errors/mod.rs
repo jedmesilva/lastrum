@@ -47,6 +47,10 @@ pub enum LastrumError {
     #[error("Invalid asset type: {0}")]
     InvalidAssetType(String),
     
+    /// Errors related to invalid request types
+    #[error("Invalid request type: {0}")]
+    InvalidRequestType(String),
+    
     /// Resource not found
     #[error("Not found: {0}")]
     NotFound(String),
@@ -62,6 +66,22 @@ pub enum LastrumError {
     /// Validation errors
     #[error("Validation error: {0}")]
     ValidationError(String),
+    
+    /// Token not found
+    #[error("Token not found: {0}")]
+    TokenNotFound(String),
+    
+    /// Unauthorized operation
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+    
+    /// Certificate expired
+    #[error("Certificate expired")]
+    CertificateExpired,
+    
+    /// Wallet not authorized for operation
+    #[error("Wallet not authorized: {0}")]
+    WalletNotAuthorized(String),
 }
 
 /// Convert from rusqlite errors to LastrumError

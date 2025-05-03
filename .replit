@@ -2,6 +2,7 @@ modules = ["rust"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["sqlite"]
 
 [workflows]
 runButton = "Project"

@@ -48,7 +48,7 @@ impl ConsensusManager {
         let issuer_exists = self.verify_issuer_exists(certificate)?;
         if !issuer_exists {
             return Ok(ConsensusResult::Rejected(
-                format!("Casa de custódia emissora '{}' não encontrada na rede", certificate.issuer)
+                format!("Casa de custódia emissora '{}' não encontrada na rede", certificate.custody_house_id)
             ));
         }
         
@@ -98,13 +98,13 @@ impl ConsensusManager {
     fn verify_issuer_exists(&self, certificate: &Certificate) -> Result<bool, LastrumError> {
         // Verifica se existe algum peer com o nome correspondente ao emissor do certificado
         let peers = self.peer_manager.get_peers();
-        let issuer_exists = peers.iter().any(|p| p.name == certificate.issuer);
+        let issuer_exists = peers.iter().any(|p| p.name == certificate.custody_house_id);
         
         // Verifica também se a chave pública corresponde
         let public_key_valid = if issuer_exists {
             peers.iter()
-                .find(|p| p.name == certificate.issuer)
-                .map(|p| p.public_key == certificate.issuer_public_key)
+                .find(|p| p.name == certificate.custody_house_id)
+                .map(|p| p.public_key == certificate.custody_house_hash)
                 .unwrap_or(false)
         } else {
             false

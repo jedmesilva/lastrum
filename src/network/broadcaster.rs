@@ -3,7 +3,7 @@
 //! Este módulo gerencia a transmissão de certificados para a rede,
 //! garantindo que os certificados emitidos sejam propagados para todos os nós.
 
-use std::sync::{Arc, Mutex};
+// Importações de sistema
 use crate::certifield::model::Certificate;
 use crate::certifield::storage::CertificateStorage;
 use crate::errors::LastrumError;
@@ -44,11 +44,15 @@ impl Broadcaster {
         
         // Em uma implementação real, isso seria enviado para todos os peers conectados
         log::info!("Broadcasting certificado: {}", certificate.id);
-        log::debug!("Emissor: {}, Asset: {} - {}g, pureza: {}", 
-            certificate.issuer, 
+        let quantity_str = format!("{} {}", certificate.asset.quantity, certificate.asset.unit);
+        let purity_str = certificate.asset.purity
+            .map_or_else(|| "N/A".to_string(), |p| format!("{}", p));
+            
+        log::debug!("Casa de Custódia: {}, Asset: {} - {}, pureza: {}", 
+            certificate.custody_house_id, 
             certificate.asset.asset_type_str(),
-            certificate.asset.weight,
-            certificate.asset.purity);
+            quantity_str,
+            purity_str);
         
         // Simula o envio para peers
         log::debug!("Mensagem criada: {:?}", certificate_message.msg_type);
