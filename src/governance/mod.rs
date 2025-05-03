@@ -66,6 +66,9 @@ pub struct AssetTypeDefinition {
     pub category: AssetCategory,
     /// Nome amigável do ativo
     pub name: String,
+    /// Descrição detalhada do tipo de ativo
+    #[serde(default)]
+    pub description: String,
     /// Unidade padrão para o ativo
     pub default_unit: String,
     /// Se requer valor de pureza

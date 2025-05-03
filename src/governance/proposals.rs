@@ -40,17 +40,37 @@ impl ProposalManager {
     /// Adiciona uma nova proposta
     pub fn add_proposal(&mut self, proposal: AssetProposal) -> Result<(), LastrumError> {
         let id = proposal.proposal_id.clone();
+        println!("ProposalManager::add_proposal - Adicionando proposta com ID: {}", id);
         
         // Verifica se já existe uma proposta com este ID
-        if self.pending_proposals.contains_key(&id) || self.finalized_proposals.contains_key(&id) {
+        if self.pending_proposals.contains_key(&id) {
+            println!("ProposalManager::add_proposal - Proposta já existe em pending_proposals");
             return Err(LastrumError::ValidationError(
-                format!("Já existe uma proposta com o ID: {}", id)
+                format!("Já existe uma proposta pendente com o ID: {}", id)
+            ));
+        }
+        
+        if self.finalized_proposals.contains_key(&id) {
+            println!("ProposalManager::add_proposal - Proposta já existe em finalized_proposals");
+            return Err(LastrumError::ValidationError(
+                format!("Já existe uma proposta finalizada com o ID: {}", id)
             ));
         }
         
         // Adiciona à lista de propostas pendentes
-        self.pending_proposals.insert(id, proposal);
+        println!("ProposalManager::add_proposal - Inserindo proposta no mapa");
+        self.pending_proposals.insert(id.clone(), proposal);
+        println!("ProposalManager::add_proposal - Proposta inserida, agora temos {} propostas pendentes", 
+                 self.pending_proposals.len());
+        
+        // Atualiza a data de atualização
         self.last_updated = Utc::now();
+        
+        // Testa a serialização
+        match serde_json::to_string_pretty(&self) {
+            Ok(json) => println!("ProposalManager::add_proposal - Serialização de teste bem-sucedida: {} bytes", json.len()),
+            Err(e) => println!("ProposalManager::add_proposal - ERRO ao serializar: {:?}", e),
+        }
         
         Ok(())
     }
@@ -148,15 +168,72 @@ impl ProposalManager {
         expired_results
     }
     
-    /// Salva o gerenciador de propostas em um arquivo JSON
+    /// Salva o gerenciador de propostas em um arquivo JSON usando uma abordagem simplificada
     pub fn save(&self, path: &Path) -> Result<(), LastrumError> {
-        let json = serde_json::to_string_pretty(&self)
-            .map_err(|e| LastrumError::SerializationError(format!("Erro ao serializar propostas: {}", e)))?;
+        println!("ProposalManager::save - Iniciando salvamento em: {:?}", path);
+        println!("ProposalManager::save - Propostas pendentes: {}", self.pending_proposals.len());
         
-        fs::write(path, json)
-            .map_err(|e| LastrumError::IoError(format!("Erro ao salvar propostas: {}", e)))?;
+        // Cria uma estrutura simplificada para serialização
+        let simplified_data = SimplifiedProposalData {
+            pending: self.pending_proposals.len(),
+            finalized: self.finalized_proposals.len(),
+            timestamp: Utc::now().to_string(),
+            proposal_ids: self.pending_proposals.keys().cloned().collect(),
+        };
+        
+        println!("ProposalManager::save - Criada estrutura simplificada com {} propostas", simplified_data.pending);
+        
+        // Serializa a estrutura simplificada
+        let json = match serde_json::to_string_pretty(&simplified_data) {
+            Ok(json_str) => {
+                println!("ProposalManager::save - Serialização bem-sucedida, tamanho: {} bytes", json_str.len());
+                json_str
+            },
+            Err(e) => {
+                println!("ProposalManager::save - Erro na serialização: {:?}", e);
+                return Err(LastrumError::SerializationError(format!("Erro ao serializar propostas: {}", e)));
+            }
+        };
+        
+        // Cria o diretório pai se não existir
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                println!("ProposalManager::save - Criando diretório pai: {:?}", parent);
+                if let Err(e) = fs::create_dir_all(parent) {
+                    println!("ProposalManager::save - Erro ao criar diretório: {:?}", e);
+                    return Err(LastrumError::IoError(format!("Erro ao criar diretório: {}", e)));
+                }
+            }
+        }
+        
+        // Escreve o arquivo temporário primeiro
+        let tmp_path = path.with_extension("tmp");
+        println!("ProposalManager::save - Escrevendo arquivo temporário: {:?}", tmp_path);
+        
+        if let Err(e) = fs::write(&tmp_path, &json) {
+            println!("ProposalManager::save - Erro ao escrever arquivo temporário: {:?}", e);
+            return Err(LastrumError::IoError(format!("Erro ao salvar propostas temporárias: {}", e)));
+        }
+        
+        // Renomeia o arquivo temporário para o nome final (operação atômica)
+        println!("ProposalManager::save - Renomeando arquivo temporário para final");
+        if let Err(e) = fs::rename(&tmp_path, path) {
+            println!("ProposalManager::save - Erro ao renomear arquivo: {:?}", e);
+            return Err(LastrumError::IoError(format!("Erro ao finalizar salvamento: {}", e)));
+        }
+        
+        println!("ProposalManager::save - Salvamento concluído com sucesso!");
         
         Ok(())
+    }
+    
+    // Estrutura simplificada para serialização
+    #[derive(Serialize, Deserialize)]
+    struct SimplifiedProposalData {
+        pending: usize,
+        finalized: usize,
+        timestamp: String,
+        proposal_ids: Vec<String>,
     }
     
     /// Carrega o gerenciador de propostas de um arquivo JSON
@@ -211,10 +288,39 @@ impl ProposalService {
     
     /// Salva o estado atual das propostas
     pub fn save(&self) -> Result<(), LastrumError> {
-        let proposals = self.proposals.lock()
-            .map_err(|_| LastrumError::ConcurrencyError("Erro ao adquirir lock das propostas".to_string()))?;
+        println!("Iniciando salvamento de propostas...");
+        println!("Caminho do arquivo: {:?}", self.proposals_path);
         
-        proposals.save(&self.proposals_path)?;
+        let lock_result = self.proposals.lock();
+        if let Err(e) = lock_result {
+            println!("Erro ao adquirir lock para salvamento: {:?}", e);
+            return Err(LastrumError::ConcurrencyError(format!("Erro ao adquirir lock para salvamento: {:?}", e)));
+        }
+        
+        let proposals = lock_result.unwrap();
+        println!("Lock adquirido para salvamento");
+        
+        // Conta quantas propostas pendentes e finalizadas existem
+        let num_pending = proposals.pending_proposals.len();
+        let num_finalized = proposals.finalized_proposals.len();
+        println!("Número de propostas pendentes: {}", num_pending);
+        println!("Número de propostas finalizadas: {}", num_finalized);
+        
+        // Tenta salvar e captura qualquer erro
+        let save_result = proposals.save(&self.proposals_path);
+        if let Err(e) = save_result {
+            println!("Erro ao salvar propostas: {:?}", e);
+            return Err(e);
+        }
+        
+        println!("Propostas salvas com sucesso!");
+        
+        // Verifica se o arquivo foi realmente atualizado
+        if let Ok(metadata) = std::fs::metadata(&self.proposals_path) {
+            if let Ok(modified) = metadata.modified() {
+                println!("Arquivo atualizado em: {:?}", modified);
+            }
+        }
         
         Ok(())
     }
@@ -225,32 +331,51 @@ impl ProposalService {
         code: String,
         category: String,
         name: String,
+        description: String,
         unit: String,
         requires_purity: bool,
         proposer_id: String,
         voting_period_days: u32,
     ) -> Result<String, LastrumError> {
+        // Log inicial para debugging
+        println!("Iniciando criação de proposta para tipo de ativo: {} ({})", name, code);
+        println!("Categoria: {}, Proponente: {}", category, proposer_id);
+        
         // Verificar se o código já existe no registro
+        if let Err(e) = self.registry_manager.is_asset_type_registered(&code) {
+            println!("Erro ao verificar se o tipo de ativo já existe: {:?}", e);
+            return Err(e);
+        }
+        
         if self.registry_manager.is_asset_type_registered(&code)? {
+            println!("Código já registrado: {}", code);
             return Err(LastrumError::ValidationError(
                 format!("Já existe um tipo de ativo registrado com o código: {}", code)
             ));
         }
         
         // Converter a categoria
-        let asset_category = crate::governance::AssetCategory::from_str(&category)
-            .ok_or_else(|| LastrumError::ValidationError(format!("Categoria inválida: {}", category)))?;
+        let asset_category_option = crate::governance::AssetCategory::from_str(&category);
+        if asset_category_option.is_none() {
+            println!("Categoria inválida: {}", category);
+            return Err(LastrumError::ValidationError(format!("Categoria inválida: {}", category)));
+        }
+        let asset_category = asset_category_option.unwrap();
+        println!("Categoria válida: {:?}", asset_category);
         
         // Criar a definição do tipo de ativo
         let asset_definition = AssetTypeDefinition {
             code: code.clone(),
             category: asset_category,
             name,
+            description,
             default_unit: unit,
             requires_purity,
             created_at: Utc::now(),
             proposed_by: proposer_id.clone(),
         };
+        
+        println!("Criando proposta para definição: {:?}", asset_definition);
         
         // Criar a proposta
         let proposal = AssetProposal::new(
@@ -260,15 +385,32 @@ impl ProposalService {
         );
         
         let proposal_id = proposal.proposal_id.clone();
+        println!("ID da proposta gerado: {}", proposal_id);
         
         // Adicionar ao gerenciador de propostas
-        let mut proposals = self.proposals.lock()
-            .map_err(|_| LastrumError::ConcurrencyError("Erro ao adquirir lock das propostas".to_string()))?;
+        println!("Adquirindo lock para adicionar proposta...");
+        let lock_result = self.proposals.lock();
+        if let Err(e) = lock_result {
+            println!("Erro ao adquirir lock: {:?}", e);
+            return Err(LastrumError::ConcurrencyError(format!("Erro ao adquirir lock das propostas: {:?}", e)));
+        }
         
-        proposals.add_proposal(proposal)?;
+        let mut proposals = lock_result.unwrap();
+        println!("Lock adquirido com sucesso");
+        
+        if let Err(e) = proposals.add_proposal(proposal.clone()) {
+            println!("Erro ao adicionar proposta: {:?}", e);
+            return Err(e);
+        }
+        println!("Proposta adicionada com sucesso");
         
         // Salvar as alterações
-        self.save()?;
+        println!("Salvando alterações...");
+        if let Err(e) = self.save() {
+            println!("Erro ao salvar alterações: {:?}", e);
+            return Err(e);
+        }
+        println!("Alterações salvas com sucesso");
         
         Ok(proposal_id)
     }

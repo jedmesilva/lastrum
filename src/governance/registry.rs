@@ -44,7 +44,8 @@ impl AssetTypeRegistry {
             "Ouro",
             "g",
             true,
-            "system"
+            "system",
+            "Metal precioso utilizado como reserva de valor e em diversas aplicações industriais, joalheria e tecnologia. Comercializado em diversas purezas, sendo 999.9 (24K) a mais pura."
         );
         
         registry.add_initial_type(
@@ -53,7 +54,8 @@ impl AssetTypeRegistry {
             "Prata",
             "g",
             true,
-            "system"
+            "system",
+            "Metal precioso com alta condutividade elétrica e térmica, utilizado em aplicações industriais, medicina, joalheria e investimento. Geralmente comercializado com pureza de 999 (prata fina)."
         );
         
         registry.add_initial_type(
@@ -62,7 +64,8 @@ impl AssetTypeRegistry {
             "Platina",
             "g",
             true,
-            "system"
+            "system",
+            "Metal nobre extremamente raro e denso, utilizado em conversores catalíticos automotivos, joalheria de luxo e aplicações industriais. Conhecido por sua resistência à corrosão e oxidação."
         );
         
         registry.add_initial_type(
@@ -71,7 +74,8 @@ impl AssetTypeRegistry {
             "Paládio",
             "g",
             true,
-            "system"
+            "system",
+            "Metal do grupo da platina, usado principalmente em conversores catalíticos, eletrônicos, odontologia, joalheria e investimento. Sua escassez e demanda industrial o tornam mais valioso que o ouro."
         );
         
         // Adiciona tipos de energia renovável
@@ -81,7 +85,8 @@ impl AssetTypeRegistry {
             "Energia Solar",
             "kWh",
             false,
-            "system"
+            "system",
+            "Energia gerada a partir da conversão da luz solar em eletricidade, seja por meio de painéis fotovoltaicos ou sistemas de concentração solar. Completamente renovável e com baixíssimo impacto ambiental."
         );
         
         registry.add_initial_type(
@@ -90,7 +95,8 @@ impl AssetTypeRegistry {
             "Energia Eólica",
             "kWh",
             false,
-            "system"
+            "system",
+            "Energia obtida a partir da conversão da energia cinética dos ventos em energia elétrica através de turbinas eólicas. Fonte limpa e renovável com mínimo impacto ambiental e sem emissão de gases de efeito estufa."
         );
         
         registry.add_initial_type(
@@ -99,7 +105,8 @@ impl AssetTypeRegistry {
             "Energia Hídrica",
             "kWh",
             false,
-            "system"
+            "system",
+            "Energia gerada pelo aproveitamento da energia potencial ou cinética da água de rios e quedas d'água. Representa uma fonte renovável importante para a matriz energética em diversos países."
         );
         
         registry.add_initial_type(
@@ -108,7 +115,8 @@ impl AssetTypeRegistry {
             "Biogás Metano",
             "m3",
             false,
-            "system"
+            "system",
+            "Gás combustível produzido pela decomposição anaeróbia de matéria orgânica (como resíduos agrícolas, esgoto e aterros). Rico em metano, pode ser utilizado para geração de energia térmica e elétrica."
         );
         
         registry.add_initial_type(
@@ -117,7 +125,8 @@ impl AssetTypeRegistry {
             "Hidrogênio Verde",
             "kg",
             false,
-            "system"
+            "system",
+            "Hidrogênio produzido por eletrólise da água utilizando fontes de energia 100% renováveis. Considerado crucial para descarbonização da economia, é um combustível que emite apenas vapor d'água quando utilizado."
         );
         
         // Adiciona tipo de tempo
@@ -127,7 +136,8 @@ impl AssetTypeRegistry {
             "Tempo de Uso de Veículo",
             "horas",
             false,
-            "system"
+            "system",
+            "Representa o uso temporário de veículos motorizados, como carros, embarcações e aeronaves. Pode ser usado para compartilhamento, aluguel ou uso fracionado de ativos de transporte."
         );
         
         registry.add_initial_type(
@@ -136,7 +146,8 @@ impl AssetTypeRegistry {
             "Tempo de Uso de Imóvel",
             "dias",
             false,
-            "system"
+            "system",
+            "Representa o uso temporário de propriedades imobiliárias como casas, apartamentos, escritórios ou espaços comerciais. Utilizado em certificados de multipropriedade e direitos de uso por tempo determinado."
         );
         
         registry
@@ -151,11 +162,13 @@ impl AssetTypeRegistry {
         unit: &str,
         requires_purity: bool,
         proposer: &str,
+        description: &str,
     ) {
         let asset_type = AssetTypeDefinition {
             code: code.to_string(),
             category,
             name: name.to_string(),
+            description: description.to_string(),
             default_unit: unit.to_string(),
             requires_purity,
             created_at: Utc::now(),

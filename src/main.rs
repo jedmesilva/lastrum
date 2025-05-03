@@ -123,6 +123,9 @@ enum Commands {
         /// Nome amigável do tipo de ativo
         #[arg(short, long)]
         name: String,
+        /// Descrição detalhada do tipo de ativo
+        #[arg(short = 'e', long)]
+        description: String,
         /// Unidade padrão para o ativo (ex: "g" para ouro)
         #[arg(short, long)]
         unit: String,
@@ -465,7 +468,7 @@ fn run(cli: Cli) -> Result<(), LastrumError> {
             
             Ok(())
         },
-        Commands::ProposeAssetType { identity, code, category, name, unit, requires_purity, voting_period_days } => {
+        Commands::ProposeAssetType { identity, code, category, name, description, unit, requires_purity, voting_period_days } => {
             // Carrega a identidade do proponente
             info!("Carregando identidade do proponente: {}", identity);
             let identity = Identity::load(&identity)?;
@@ -480,9 +483,18 @@ fn run(cli: Cli) -> Result<(), LastrumError> {
                 ));
             }
             
-            // Validação simples de categoria
-            if !["METAL", "ENERGY", "TIME", "DATA"].contains(&category.as_str()) {
-                return Err(LastrumError::ValidationError(format!("Categoria inválida: {}", category)));
+            // Validação de categoria usando o enum
+            let valid_categories = [
+                "METAL", "ENERGY", "TIME", "PROPERTY", 
+                "FINANCIAL", "NATURAL_RESOURCE", "OTHER"
+            ];
+            
+            if !valid_categories.contains(&category.to_uppercase().as_str()) {
+                return Err(LastrumError::ValidationError(
+                    format!("Categoria inválida: {}. Categorias válidas: {}", 
+                           category, 
+                           valid_categories.join(", "))
+                ));
             }
             
             // Cria o serviço de propostas (assumindo um número fixo de casas de custódia por enquanto)
@@ -490,14 +502,18 @@ fn run(cli: Cli) -> Result<(), LastrumError> {
             let total_custody_houses = 10; // Número simulado para desenvolvimento
             let proposal_service = ProposalService::new(registry_manager.clone(), total_custody_houses)?;
             
-            // Salva a categoria para usar depois
+            // Salva valores para usar depois
             let category_str = category.clone();
+            let name_str = name.clone();
+            let description_str = description.clone();
+            let unit_str = unit.clone();
             
             // Propõe o novo tipo de ativo
             let proposal_id = proposal_service.propose_asset_type(
                 code,
                 category,
                 name,
+                description,
                 unit,
                 requires_purity,
                 identity.name().to_string(),
@@ -506,7 +522,10 @@ fn run(cli: Cli) -> Result<(), LastrumError> {
             
             info!("✅ Proposta de tipo de ativo criada com sucesso!");
             info!("ID da proposta: {}", proposal_id);
+            info!("Nome: {}", name_str);
+            info!("Descrição: {}", description_str);
             info!("Categoria: {}", category_str);
+            info!("Unidade: {}", unit_str);
             info!("Requer pureza: {}", if requires_purity { "Sim" } else { "Não" });
             info!("Período de votação: {} dias", voting_period_days);
             info!("A proposta está aberta para votação e será finalizada após {} dias ou quando atingir consenso.", voting_period_days);
@@ -553,6 +572,7 @@ fn run(cli: Cli) -> Result<(), LastrumError> {
                     info!("{}. ID: {}", i + 1, proposal.proposal_id);
                     info!("   Código: {}", proposal.asset_definition.code);
                     info!("   Nome: {}", proposal.asset_definition.name);
+                    info!("   Descrição: {}", proposal.asset_definition.description);
                     info!("   Categoria: {:?}", proposal.asset_definition.category);
                     info!("   Unidade: {}", proposal.asset_definition.default_unit);
                     info!("   Requer pureza: {}", proposal.asset_definition.requires_purity);
@@ -576,6 +596,7 @@ fn run(cli: Cli) -> Result<(), LastrumError> {
                     info!("{}. ID: {}", i + 1, proposal.proposal_id);
                     info!("   Código: {}", proposal.asset_definition.code);
                     info!("   Nome: {}", proposal.asset_definition.name);
+                    info!("   Descrição: {}", proposal.asset_definition.description);
                     info!("   Categoria: {:?}", proposal.asset_definition.category);
                     info!("   Status: {:?}", proposal.status);
                     info!("   -----------------------------");
@@ -598,6 +619,7 @@ fn run(cli: Cli) -> Result<(), LastrumError> {
                 for (i, asset_type) in asset_types.iter().enumerate() {
                     info!("{}. Código: {}", i + 1, asset_type.code);
                     info!("   Nome: {}", asset_type.name);
+                    info!("   Descrição: {}", asset_type.description);
                     info!("   Categoria: {:?}", asset_type.category);
                     info!("   Unidade: {}", asset_type.default_unit);
                     info!("   Requer pureza: {}", asset_type.requires_purity);

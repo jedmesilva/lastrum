@@ -61,9 +61,20 @@ impl Identity {
         Ok(file_path.to_string_lossy().to_string())
     }
     
-    /// Load an identity from a file
-    pub fn load(path: &str) -> Result<Self, LastrumError> {
-        let json = fs::read_to_string(path)
+    /// Load an identity from a file or by node hash
+    pub fn load(id_or_path: &str) -> Result<Self, LastrumError> {
+        // Verifica se o id_or_path é um caminho completo ou apenas o hash do nó
+        let path = if id_or_path.ends_with(".json") {
+            id_or_path.to_string()
+        } else {
+            // Assume que é o hash do nó e constrói o caminho completo
+            let config = Config::new()?;
+            let file_name = format!("{}.identity.json", id_or_path);
+            config.identity_dir().join(file_name).to_string_lossy().to_string()
+        };
+        
+        // Tenta ler o arquivo
+        let json = fs::read_to_string(&path)
             .map_err(|e| LastrumError::IoError(format!("Failed to read identity file: {}", e)))?;
         
         let identity: Identity = serde_json::from_str(&json)
