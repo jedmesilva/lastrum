@@ -16,6 +16,8 @@ Lastrum Certifield é uma plataforma descentralizada para a emissão e verifica�
 - **Suporte Multi-Ativos**: Certificação de metais preciosos e energias renováveis
 - **Tokenização**: Capacidade de emitir tokens representando frações dos ativos certificados
 - **Migração de Certificados**: Compatibilidade com formatos legados e conversão automática
+- **Governança Descentralizada**: Sistema de propostas e votação para novos tipos de ativos
+- **Extensibilidade**: Mecanismo democrático para adicionar novas categorias de ativos
 
 ## Mecanismo de Consenso
 
@@ -82,6 +84,48 @@ lastrum_certifield start-node --identity /caminho/para/identidade.json --port 80
 lastrum_certifield sync-certificates
 ```
 
+### Governança Descentralizada
+
+#### Propor Novo Tipo de Ativo
+
+```bash
+lastrum_certifield propose-asset-type \
+    --identity /caminho/para/identidade.json \
+    --code "CPU_TIME" \
+    --category "TIME" \
+    --name "Horas de Computação" \
+    --unit "h" \
+    --requires-purity \
+    --voting-period-days 7
+```
+
+#### Votar em uma Proposta
+
+```bash
+lastrum_certifield vote-asset-proposal \
+    --identity /caminho/para/identidade.json \
+    --proposal-id "id-da-proposta" \
+    --approve
+```
+
+#### Listar Propostas Pendentes
+
+```bash
+lastrum_certifield list-asset-proposals
+```
+
+#### Listar Tipos de Ativos Registrados
+
+```bash
+lastrum_certifield list-asset-types
+```
+
+#### Verificar Propostas Expiradas
+
+```bash
+lastrum_certifield check-expired-proposals
+```
+
 ## Tipos de Ativos Suportados
 
 ### Metais Preciosos
@@ -97,6 +141,10 @@ lastrum_certifield sync-certificates
 - **BIOGAS_METANO**: Certificados de biogás/metano
 - **HIDROGENIO_VERDE**: Certificados de hidrogênio verde
 
+### Tempo de Uso
+- **TEMPO_VEICULO**: Certificados de tempo de uso de veículos (horas)
+- **TEMPO_IMOVEL**: Certificados de tempo de uso de imóveis (dias)
+
 ## Tecnologias
 
 - Linguagem Rust para segurança e performance
@@ -111,6 +159,7 @@ lastrum_certifield sync-certificates
 - `core/`: Componentes principais (identidade, chaves, assinaturas)
 - `certifield/`: Gerenciamento de certificados (modelo, construtor, armazenamento)
 - `network/`: Infraestrutura de rede descentralizada (P2P, consenso, sincronização)
+- `governance/`: Sistema de governança descentralizada (propostas, votação, registro)
 - `utils/`: Utilitários comuns
 - `config/`: Configurações do sistema
 - `errors/`: Definições de erro
@@ -121,6 +170,8 @@ Os dados são armazenados localmente em:
 
 - **Certificados**: `/home/USER/.local/share/certifield/certificates.db` (SQLite)
 - **Identidades**: `/home/USER/.local/share/certifield/identities/` (arquivos JSON)
+- **Tipos de Ativos**: `/home/USER/.local/share/certifield/asset_registry.json` (JSON)
+- **Propostas de Governança**: `/home/USER/.local/share/certifield/asset_proposals.json` (JSON)
 
 ## Fluxo de Certificação e Validação
 
@@ -129,3 +180,13 @@ Os dados são armazenados localmente em:
 3. Certificado é armazenado localmente e pode ser propagado na rede
 4. Qualquer participante pode verificar a autenticidade do certificado localmente
 5. Quando necessário, tokens podem ser emitidos representando frações do ativo certificado
+
+## Fluxo de Governança
+
+1. Casa de custódia propõe um novo tipo de ativo através do comando `propose-asset-type`
+2. A proposta entra em período de votação (definido em dias)
+3. Outras casas de custódia votam na proposta (approve/reject) via `vote-asset-proposal`
+4. Ao final do período de votação, ou quando alcançar consenso:
+   - Se aprovada (>50% dos votos), o tipo de ativo é adicionado ao registro
+   - Se rejeitada, a proposta é arquivada
+5. Novos certificados podem ser emitidos utilizando o tipo de ativo aprovado

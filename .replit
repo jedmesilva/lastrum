@@ -34,7 +34,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cargo run -- verify-certificate --certificate \"8189d7a3-f002-443c-98cc-2975f5510c1e\""
+args = "cargo run -- verify-certificate --certificate \"53b758eb-5731-447a-be9e-addd441fb300\""
 
 [deployment]
 run = ["sh", "-c", "cd $(pwd) && cargo build && cargo run"]
