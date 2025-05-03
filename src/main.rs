@@ -127,6 +127,7 @@ fn run(cli: Cli) -> Result<(), LastrumError> {
             info!("Identity saved to: {}", path);
             info!("Public key: {}", identity.keypair().public_key_hex());
             info!("Node hash: {}", identity.node_hash());
+            info!("Registered at: {}", identity.registered_at());
             Ok(())
         }
         Commands::IssueCertificate { identity, asset_type, weight, purity, serial } => {

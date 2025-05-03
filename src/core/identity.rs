@@ -7,6 +7,7 @@ use serde::{Serialize, Deserialize};
 use std::fs;
 // PathBuf utilizado apenas em funções comentadas
 use uuid::Uuid;
+use chrono::{DateTime, Utc};
 
 use crate::config::Config;
 use crate::core::hash_util;
@@ -24,6 +25,8 @@ pub struct Identity {
     keypair: KeyPair,
     /// Hash identifier for this node in the network
     node_hash: String,
+    /// Date and time when this identity was registered
+    registered_at: DateTime<Utc>,
 }
 
 impl Identity {
@@ -32,12 +35,14 @@ impl Identity {
         let keypair = KeyPair::generate()?;
         let node_hash = hash_util::generate_node_hash(&name, &keypair.public_key_hex());
         let id = Uuid::new_v4().to_string();
+        let registered_at = Utc::now();
         
         Ok(Self {
             id,
             name,
             keypair,
             node_hash,
+            registered_at,
         })
     }
     
@@ -109,6 +114,11 @@ impl Identity {
     pub fn keypair(&self) -> &KeyPair {
         &self.keypair
     }
+    
+    /// Get the registration date and time
+    pub fn registered_at(&self) -> &DateTime<Utc> {
+        &self.registered_at
+    }
 }
 
 #[cfg(test)]
@@ -122,6 +132,10 @@ mod tests {
         assert_eq!(identity.name(), "TestCustody");
         assert!(!identity.node_hash().is_empty());
         assert!(!identity.keypair().public_key_hex().is_empty());
+        // Verifica se a data de registro foi definida (deve ser próxima ao tempo atual)
+        let now = Utc::now();
+        let diff = now.signed_duration_since(*identity.registered_at());
+        assert!(diff.num_seconds() < 10, "A data de registro deve ser próxima ao tempo atual");
     }
     
     #[test]
@@ -144,5 +158,6 @@ mod tests {
         assert_eq!(loaded.name(), identity.name());
         assert_eq!(loaded.node_hash(), identity.node_hash());
         assert_eq!(loaded.keypair().public_key_hex(), identity.keypair().public_key_hex());
+        assert_eq!(loaded.registered_at(), identity.registered_at());
     }
 }
