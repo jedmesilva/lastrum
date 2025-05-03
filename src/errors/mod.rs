@@ -82,6 +82,10 @@ pub enum LastrumError {
     /// Wallet not authorized for operation
     #[error("Wallet not authorized: {0}")]
     WalletNotAuthorized(String),
+    
+    /// Concurrent access error
+    #[error("Concurrency error: {0}")]
+    ConcurrencyError(String),
 }
 
 /// Convert from rusqlite errors to LastrumError

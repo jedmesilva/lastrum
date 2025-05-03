@@ -6,6 +6,8 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use directories::ProjectDirs;
+use crate::errors::LastrumError;
 
 /// Check if a file exists
 pub fn file_exists(path: &Path) -> bool {
@@ -56,6 +58,23 @@ pub fn write_json_file<T: serde::Serialize>(path: &Path, data: &T) -> Result<(),
     
     fs::write(path, json)
         .map_err(|e| format!("Failed to write file: {}", e))
+}
+
+/// Get the application data directory
+/// Creates the directory if it doesn't exist
+pub fn get_data_dir() -> Result<PathBuf, LastrumError> {
+    // Get the project directories using the application metadata
+    let proj_dirs = ProjectDirs::from("com", "lastrum", "certifield")
+        .ok_or_else(|| LastrumError::IoError("Falha ao obter diretório de dados do usuário".to_string()))?;
+    
+    // Use the data directory for application data
+    let data_dir = proj_dirs.data_dir();
+    
+    // Ensure the directory exists
+    fs::create_dir_all(data_dir)
+        .map_err(|e| LastrumError::IoError(format!("Falha ao criar diretório de dados: {}", e)))?;
+    
+    Ok(data_dir.to_path_buf())
 }
 
 #[cfg(test)]

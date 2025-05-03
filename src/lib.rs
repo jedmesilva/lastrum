@@ -31,6 +31,7 @@ pub mod certifield;
 pub mod network;
 pub mod utils;
 pub mod errors;
+pub mod governance;
 
 #[cfg(test)]
 mod tests;

@@ -27,6 +27,13 @@ use lastrum_certifield::{
         sync::LedgerSyncManager,
         protocol::{Message, MessageType}
     },
+    governance::{
+        self,
+        AssetCategory,
+        AssetTypeDefinition,
+        registry::RegistryManager,
+        proposals::ProposalService,
+    },
 };
 
 #[derive(Parser)]
@@ -101,6 +108,53 @@ enum Commands {
     },
     /// Sincroniza certificados com a rede
     SyncCertificates,
+    
+    /// Propõe um novo tipo de ativo para a rede
+    ProposeAssetType {
+        /// Caminho para o arquivo de identidade do proponente
+        #[arg(short, long)]
+        identity: String,
+        /// Código único do tipo de ativo (ex: "GOLD")
+        #[arg(short = 'd', long)]
+        code: String,
+        /// Categoria do ativo (METAL, ENERGY, TIME, etc.)
+        #[arg(short, long)]
+        category: String,
+        /// Nome amigável do tipo de ativo
+        #[arg(short, long)]
+        name: String,
+        /// Unidade padrão para o ativo (ex: "g" para ouro)
+        #[arg(short, long)]
+        unit: String,
+        /// Se o ativo requer valor de pureza
+        #[arg(long, default_value_t = false)]
+        requires_purity: bool,
+        /// Período de votação em dias (padrão: 7)
+        #[arg(long, default_value_t = 7)]
+        voting_period_days: u32,
+    },
+    
+    /// Vota em uma proposta de tipo de ativo
+    VoteAssetProposal {
+        /// Caminho para o arquivo de identidade do votante
+        #[arg(short, long)]
+        identity: String,
+        /// ID da proposta
+        #[arg(short, long)]
+        proposal_id: String,
+        /// Voto (aprovar ou reprovar)
+        #[arg(short, long)]
+        approve: bool,
+    },
+    
+    /// Lista todas as propostas pendentes
+    ListAssetProposals,
+    
+    /// Lista todos os tipos de ativos registrados
+    ListAssetTypes,
+    
+    /// Verifica propostas expiradas e finaliza-as
+    CheckExpiredProposals,
 }
 
 fn main() {
@@ -408,6 +462,174 @@ fn run(cli: Cli) -> Result<(), LastrumError> {
         Commands::SyncCertificates => {
             info!("Esta funcionalidade requer um nó em execução.");
             info!("Por favor, inicie um nó com o comando 'start-node' para sincronizar certificados.");
+            
+            Ok(())
+        },
+        Commands::ProposeAssetType { identity, code, category, name, unit, requires_purity, voting_period_days } => {
+            // Carrega a identidade do proponente
+            info!("Carregando identidade do proponente: {}", identity);
+            let identity = Identity::load(&identity)?;
+            
+            // Cria o gerenciador de registro
+            let registry_manager = Arc::new(RegistryManager::new()?);
+            
+            // Verifica se o tipo de ativo já existe
+            if registry_manager.is_asset_type_registered(&code)? {
+                return Err(LastrumError::ValidationError(
+                    format!("Já existe um tipo de ativo com o código: {}", code)
+                ));
+            }
+            
+            // Validação simples de categoria
+            if !["METAL", "ENERGY", "TIME", "DATA"].contains(&category.as_str()) {
+                return Err(LastrumError::ValidationError(format!("Categoria inválida: {}", category)));
+            }
+            
+            // Cria o serviço de propostas (assumindo um número fixo de casas de custódia por enquanto)
+            // Na implementação completa, esse número viria de um serviço de identidade da rede
+            let total_custody_houses = 10; // Número simulado para desenvolvimento
+            let proposal_service = ProposalService::new(registry_manager.clone(), total_custody_houses)?;
+            
+            // Salva a categoria para usar depois
+            let category_str = category.clone();
+            
+            // Propõe o novo tipo de ativo
+            let proposal_id = proposal_service.propose_asset_type(
+                code,
+                category,
+                name,
+                unit,
+                requires_purity,
+                identity.name().to_string(),
+                voting_period_days
+            )?;
+            
+            info!("✅ Proposta de tipo de ativo criada com sucesso!");
+            info!("ID da proposta: {}", proposal_id);
+            info!("Categoria: {}", category_str);
+            info!("Requer pureza: {}", if requires_purity { "Sim" } else { "Não" });
+            info!("Período de votação: {} dias", voting_period_days);
+            info!("A proposta está aberta para votação e será finalizada após {} dias ou quando atingir consenso.", voting_period_days);
+            
+            Ok(())
+        },
+        Commands::VoteAssetProposal { identity, proposal_id, approve } => {
+            // Carrega a identidade do votante
+            info!("Carregando identidade do votante: {}", identity);
+            let identity = Identity::load(&identity)?;
+            
+            // Cria o gerenciador de registro
+            let registry_manager = Arc::new(RegistryManager::new()?);
+            
+            // Cria o serviço de propostas
+            let total_custody_houses = 10; // Número simulado para desenvolvimento
+            let proposal_service = ProposalService::new(registry_manager.clone(), total_custody_houses)?;
+            
+            // Registra o voto
+            proposal_service.vote_on_proposal(&proposal_id, identity.name().to_string(), approve)?;
+            
+            info!("✅ Voto registrado com sucesso!");
+            info!("Proposta: {}", proposal_id);
+            info!("Voto: {}", if approve { "Aprovado" } else { "Rejeitado" });
+            
+            Ok(())
+        },
+        Commands::ListAssetProposals => {
+            // Cria o gerenciador de registro
+            let registry_manager = Arc::new(RegistryManager::new()?);
+            
+            // Cria o serviço de propostas
+            let total_custody_houses = 10; // Número simulado para desenvolvimento
+            let proposal_service = ProposalService::new(registry_manager.clone(), total_custody_houses)?;
+            
+            // Lista propostas pendentes
+            let pending_proposals = proposal_service.list_pending_proposals()?;
+            
+            if pending_proposals.is_empty() {
+                info!("Não há propostas pendentes no momento.");
+            } else {
+                info!("Propostas pendentes:");
+                for (i, proposal) in pending_proposals.iter().enumerate() {
+                    info!("{}. ID: {}", i + 1, proposal.proposal_id);
+                    info!("   Código: {}", proposal.asset_definition.code);
+                    info!("   Nome: {}", proposal.asset_definition.name);
+                    info!("   Categoria: {:?}", proposal.asset_definition.category);
+                    info!("   Unidade: {}", proposal.asset_definition.default_unit);
+                    info!("   Requer pureza: {}", proposal.asset_definition.requires_purity);
+                    info!("   Proposto por: {}", proposal.asset_definition.proposed_by);
+                    info!("   Data da proposta: {}", proposal.proposed_at);
+                    info!("   Prazo final: {}", proposal.voting_ends_at);
+                    info!("   Votos a favor: {}", proposal.votes.values().filter(|&&v| v).count());
+                    info!("   Votos contra: {}", proposal.votes.values().filter(|&&v| !v).count());
+                    info!("   -----------------------------");
+                }
+            }
+            
+            // Lista propostas finalizadas
+            let finalized_proposals = proposal_service.list_finalized_proposals()?;
+            
+            if finalized_proposals.is_empty() {
+                info!("Não há propostas finalizadas.");
+            } else {
+                info!("Propostas finalizadas:");
+                for (i, proposal) in finalized_proposals.iter().enumerate() {
+                    info!("{}. ID: {}", i + 1, proposal.proposal_id);
+                    info!("   Código: {}", proposal.asset_definition.code);
+                    info!("   Nome: {}", proposal.asset_definition.name);
+                    info!("   Categoria: {:?}", proposal.asset_definition.category);
+                    info!("   Status: {:?}", proposal.status);
+                    info!("   -----------------------------");
+                }
+            }
+            
+            Ok(())
+        },
+        Commands::ListAssetTypes => {
+            // Cria o gerenciador de registro
+            let registry_manager = Arc::new(RegistryManager::new()?);
+            
+            // Lista todos os tipos de ativos registrados
+            let asset_types = registry_manager.list_all_asset_types()?;
+            
+            if asset_types.is_empty() {
+                info!("Não há tipos de ativos registrados.");
+            } else {
+                info!("Tipos de ativos registrados:");
+                for (i, asset_type) in asset_types.iter().enumerate() {
+                    info!("{}. Código: {}", i + 1, asset_type.code);
+                    info!("   Nome: {}", asset_type.name);
+                    info!("   Categoria: {:?}", asset_type.category);
+                    info!("   Unidade: {}", asset_type.default_unit);
+                    info!("   Requer pureza: {}", asset_type.requires_purity);
+                    info!("   Proposto por: {}", asset_type.proposed_by);
+                    info!("   Registrado em: {}", asset_type.created_at);
+                    info!("   -----------------------------");
+                }
+            }
+            
+            Ok(())
+        },
+        Commands::CheckExpiredProposals => {
+            // Cria o gerenciador de registro
+            let registry_manager = Arc::new(RegistryManager::new()?);
+            
+            // Cria o serviço de propostas
+            let total_custody_houses = 10; // Número simulado para desenvolvimento
+            let proposal_service = ProposalService::new(registry_manager.clone(), total_custody_houses)?;
+            
+            // Verifica propostas expiradas
+            let expired_results = proposal_service.check_expired_proposals()?;
+            
+            if expired_results.is_empty() {
+                info!("Não há propostas expiradas para finalizar.");
+            } else {
+                info!("Propostas finalizadas por expiração:");
+                for (i, (id, approved)) in expired_results.iter().enumerate() {
+                    info!("{}. ID: {}", i + 1, id);
+                    info!("   Resultado: {}", if *approved { "APROVADA" } else { "REJEITADA" });
+                    info!("   -----------------------------");
+                }
+            }
             
             Ok(())
         }
