@@ -11,7 +11,11 @@ use serde::{Deserialize, Serialize};
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::governance::AssetCategory;
+use crate::governance::{AssetCategory, AssetProposal, AssetTypeDefinition, ProposalStatus, SignedVote};
+use crate::governance::registry::RegistryManager;
+use crate::errors::LastrumError;
+use crate::core::signer::Signer;
+use crate::utils::file;
 
 /// Estrutura de metadados básicos de uma proposta
 #[derive(Debug, Serialize, Deserialize)]
@@ -43,10 +47,7 @@ pub struct SimplifiedProposalData {
     pub proposal_ids: Vec<String>, // Campo mantido para retrocompatibilidade
 }
 
-use crate::errors::LastrumError;
-use crate::governance::{AssetProposal, AssetTypeDefinition, ProposalStatus};
-use crate::governance::registry::RegistryManager;
-use crate::utils::file;
+
 
 /// Gerenciador de propostas de tipos de ativos
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -127,7 +128,23 @@ impl ProposalManager {
         self.finalized_proposals.values().collect()
     }
     
-    /// Adiciona um voto a uma proposta
+    /// Adiciona um voto assinado a uma proposta
+    pub fn add_signed_vote(&mut self, proposal_id: &str, custody_house_id: String, vote: bool, signer: &Signer) -> Result<(), LastrumError> {
+        // Verifica se a proposta existe e está pendente
+        let proposal = self.pending_proposals.get_mut(proposal_id)
+            .ok_or_else(|| LastrumError::NotFound(format!("Proposta não encontrada: {}", proposal_id)))?;
+        
+        // Adiciona o voto assinado
+        proposal.add_signed_vote(custody_house_id, vote, signer)?;
+        
+        // Atualiza timestamp
+        self.last_updated = Utc::now();
+        
+        Ok(())
+    }
+    
+    /// Adiciona um voto a uma proposta (método legado)
+    #[deprecated(note = "Use add_signed_vote instead")]
     pub fn add_vote(&mut self, proposal_id: &str, custody_house_id: String, vote: bool) -> Result<(), LastrumError> {
         // Verifica se a proposta existe e está pendente
         let proposal = self.pending_proposals.get_mut(proposal_id)
@@ -385,6 +402,7 @@ impl ProposalManager {
                         let proposal = AssetProposal {
                             proposal_id: metadata.id.clone(),
                             asset_definition,
+                            signed_votes: Vec::new(), // Inicialmente sem votos assinados
                             votes,
                             proposed_at,
                             voting_ends_at,
@@ -635,7 +653,88 @@ impl ProposalService {
         Ok(proposal_id)
     }
     
-    /// Adiciona um voto a uma proposta
+    /// Adiciona um voto assinado a uma proposta
+    pub fn vote_on_proposal_signed(&self, proposal_id: &str, custody_house_id: String, vote: bool, signer: &Signer) -> Result<(), LastrumError> {
+        println!("vote_on_proposal_signed - Iniciando votação na proposta: {}", proposal_id);
+        println!("vote_on_proposal_signed - Votante: {}, Voto: {}", custody_house_id, if vote { "aprovar" } else { "rejeitar" });
+        
+        let mut proposals = match self.proposals.lock() {
+            Ok(guard) => {
+                println!("vote_on_proposal_signed - Lock adquirido com sucesso");
+                guard
+            },
+            Err(e) => {
+                println!("vote_on_proposal_signed - Erro ao adquirir lock: {:?}", e);
+                return Err(LastrumError::ConcurrencyError("Erro ao adquirir lock das propostas".to_string()));
+            }
+        };
+        
+        println!("vote_on_proposal_signed - Adicionando voto assinado à proposta");
+        if let Err(e) = proposals.add_signed_vote(proposal_id, custody_house_id.clone(), vote, signer) {
+            println!("vote_on_proposal_signed - Erro ao adicionar voto assinado: {:?}", e);
+            return Err(e);
+        }
+        println!("vote_on_proposal_signed - Voto assinado adicionado com sucesso");
+        
+        // Verifica se a proposta atingiu o limite para aprovação/rejeição
+        println!("vote_on_proposal_signed - Verificando status para possível finalização");
+        if let Some(proposal) = proposals.get_proposal(proposal_id) {
+            let (approve_votes, reject_votes, approved) = proposal.calculate_result(self.total_custody_houses);
+            println!("vote_on_proposal_signed - Contagem atual: {} aprovações, {} rejeições", approve_votes, reject_votes);
+            
+            // Se já temos votos suficientes para determinar o resultado
+            let majority_reached = approve_votes > (self.total_custody_houses / 2) ||
+                                  reject_votes >= (self.total_custody_houses / 2);
+            
+            if majority_reached {
+                println!("vote_on_proposal_signed - Maioria atingida, finalizando proposta com status: {}", if approved { "APROVADA" } else { "REJEITADA" });
+                // Finaliza a proposta
+                match proposals.finalize_proposal(proposal_id, approved) {
+                    Ok(asset_definition) => {
+                        // Se foi aprovada, adiciona ao registro
+                        if approved {
+                            println!("vote_on_proposal_signed - Adicionando tipo de ativo ao registro");
+                            if let Err(e) = self.registry_manager.add_asset_type(asset_definition) {
+                                println!("vote_on_proposal_signed - Erro ao adicionar tipo de ativo: {:?}", e);
+                                return Err(e);
+                            }
+                            println!("vote_on_proposal_signed - Tipo de ativo adicionado com sucesso");
+                        }
+                    },
+                    Err(e) => {
+                        println!("vote_on_proposal_signed - Erro ao finalizar proposta: {:?}", e);
+                        return Err(e);
+                    }
+                }
+            } else {
+                println!("vote_on_proposal_signed - Ainda não há maioria, proposta continua pendente");
+            }
+        } else {
+            println!("vote_on_proposal_signed - Proposta não encontrada depois de adicionar voto!");
+        }
+        
+        // Salva as alterações diretamente no gerenciador de propostas
+        println!("vote_on_proposal_signed - Salvando alterações diretamente");
+        if let Err(e) = proposals.save(&self.proposals_path) {
+            println!("vote_on_proposal_signed - Erro ao salvar diretamente: {:?}", e);
+            return Err(e);
+        }
+        println!("vote_on_proposal_signed - Salvamento direto concluído com sucesso");
+        
+        // Verificamos se o arquivo foi atualizado
+        if let Ok(metadata) = std::fs::metadata(&self.proposals_path) {
+            if let Ok(modified) = metadata.modified() {
+                println!("vote_on_proposal_signed - Arquivo atualizado em: {:?}", modified);
+            }
+        }
+        
+        println!("vote_on_proposal_signed - Votação processada com sucesso!");
+        
+        Ok(())
+    }
+    
+    /// Adiciona um voto a uma proposta (método legado)
+    #[deprecated(note = "Use vote_on_proposal_signed instead")]
     pub fn vote_on_proposal(&self, proposal_id: &str, custody_house_id: String, vote: bool) -> Result<(), LastrumError> {
         println!("vote_on_proposal - Iniciando votação na proposta: {}", proposal_id);
         println!("vote_on_proposal - Votante: {}, Voto: {}", custody_house_id, if vote { "aprovar" } else { "rejeitar" });

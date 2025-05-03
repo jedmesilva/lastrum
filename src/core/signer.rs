@@ -3,11 +3,13 @@
 //! This module provides functions for signing data using
 //! the ed25519 signature algorithm.
 
-use ed25519_dalek::{Signer as DalekSigner};
+use ed25519_dalek::{Signer as DalekSigner, Verifier as DalekVerifier, PublicKey};
+use sha2::{Digest, Sha256};
 
 use crate::certifield::model::Certificate;
 use crate::core::keypair::KeyPair;
 use crate::errors::LastrumError;
+use crate::core::hash_util;
 
 /// A signer for creating digital signatures
 pub struct Signer {
@@ -24,6 +26,37 @@ impl Signer {
     pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, LastrumError> {
         let signature = self.keypair.inner().sign(data);
         Ok(signature.to_bytes().to_vec())
+    }
+    
+    /// Generate a string signature in hexadecimal format
+    pub fn sign_to_hex(&self, data: &[u8]) -> Result<String, LastrumError> {
+        let signature = self.sign(data)?;
+        Ok(hex::encode(signature))
+    }
+    
+    /// Generate a hash for the given data
+    pub fn hash(&self, data: &str) -> Result<String, LastrumError> {
+        Ok(hash_util::sha256_hash(data.as_bytes()))
+    }
+    
+    /// Verify a signature using this signer's public key
+    pub fn verify(&self, data: &str, signature_hex: &str) -> Result<bool, LastrumError> {
+        // Decode the signature from hex
+        let signature_bytes = hex::decode(signature_hex)
+            .map_err(|e| LastrumError::SignatureError(format!("Invalid signature hex: {}", e)))?;
+        
+        // Convert signature bytes to a Signature
+        let signature = ed25519_dalek::Signature::from_bytes(&signature_bytes)
+            .map_err(|e| LastrumError::SignatureError(format!("Invalid signature format: {}", e)))?;
+        
+        // Get the public key from keypair
+        let public_key = self.keypair.inner().public;
+        
+        // Verify the signature
+        match public_key.verify(data.as_bytes(), &signature) {
+            Ok(_) => Ok(true),
+            Err(_) => Ok(false),
+        }
     }
     
     /// Sign a certificate, adding the signature to it

@@ -537,6 +537,11 @@ fn run(cli: Cli) -> Result<(), LastrumError> {
             info!("Carregando identidade do votante: {}", identity);
             let identity = Identity::load(&identity)?;
             
+            // Obtém o keypair para assinar o voto
+            let keypair = identity.keypair().clone();
+            // Cria um signer para a assinatura do voto
+            let signer = Signer::new(keypair);
+            
             // Cria o gerenciador de registro
             let registry_manager = Arc::new(RegistryManager::new()?);
             
@@ -544,12 +549,13 @@ fn run(cli: Cli) -> Result<(), LastrumError> {
             let total_custody_houses = 10; // Número simulado para desenvolvimento
             let proposal_service = ProposalService::new(registry_manager.clone(), total_custody_houses)?;
             
-            // Registra o voto
-            proposal_service.vote_on_proposal(&proposal_id, identity.name().to_string(), approve)?;
+            // Registra o voto com assinatura criptográfica
+            proposal_service.vote_on_proposal_signed(&proposal_id, identity.name().to_string(), approve, &signer)?;
             
-            info!("✅ Voto registrado com sucesso!");
+            info!("✅ Voto registrado com sucesso com assinatura criptográfica!");
             info!("Proposta: {}", proposal_id);
             info!("Voto: {}", if approve { "Aprovado" } else { "Rejeitado" });
+            info!("Voto assinado e verificado criptograficamente.");
             
             Ok(())
         },
