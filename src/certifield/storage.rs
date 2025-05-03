@@ -91,10 +91,38 @@ impl CertificateStorage {
                 _ => LastrumError::DatabaseError(format!("Database error: {}", e)),
             })?;
         
-        let certificate: Certificate = serde_json::from_str(&json)
-            .map_err(|e| LastrumError::DeserializationError(e.to_string()))?;
-        
-        Ok(certificate)
+        // Tenta deserializar diretamente
+        match serde_json::from_str::<Certificate>(&json) {
+            Ok(certificate) => Ok(certificate),
+            Err(e) => {
+                log::warn!("Erro ao deserializar certificado {}: {}. Tentando migrar...", id, e);
+                
+                // Se falhar, tenta migrar do formato legado
+                match self.migrate_legacy_certificate(id, &json) {
+                    Ok(migrated) => {
+                        // Se a migração for bem-sucedida, salva o certificado atualizado
+                        log::info!("Atualizando certificado {} para o novo formato no armazenamento", id);
+                        let _ = self.conn.execute(
+                            "UPDATE certificates SET data = ? WHERE id = ?",
+                            params![
+                                serde_json::to_string(&migrated).map_err(|e| 
+                                    LastrumError::SerializationError(format!("Falha ao serializar certificado migrado: {}", e))
+                                )?,
+                                id
+                            ]
+                        ).map_err(|e| 
+                            LastrumError::DatabaseError(format!("Falha ao atualizar certificado migrado: {}", e))
+                        )?;
+                        
+                        Ok(migrated)
+                    },
+                    Err(e) => {
+                        log::error!("Falha na migração do certificado {}: {}", id, e);
+                        Err(e)
+                    }
+                }
+            }
+        }
     }
     
     /// List all certificates
